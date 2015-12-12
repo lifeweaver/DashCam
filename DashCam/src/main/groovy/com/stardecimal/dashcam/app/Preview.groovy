@@ -3,10 +3,11 @@ package com.stardecimal.dashcam.app
 import android.content.Context
 import android.hardware.Camera
 import android.util.Log
+import android.view.Display
+import android.view.Surface
 import android.view.SurfaceHolder
-import android.view.SurfaceView
 import android.view.ViewGroup
-import android.widget.FrameLayout
+import android.view.WindowManager
 import groovy.transform.CompileStatic
 
 /**
@@ -56,7 +57,7 @@ class Preview extends ViewGroup implements SurfaceHolder.Callback {
         // If your preview can change or rotate, take care of those events here.
         // Make sure to stop the preview before resizing or reformatting it.
 
-        if(mHolder.surface) {
+        if(!mHolder.surface) {
             // preview surface does not exist.
             return
         }
@@ -69,6 +70,13 @@ class Preview extends ViewGroup implements SurfaceHolder.Callback {
         }
 
         // set preview size and make any resize, rotate or reformatting changes here
+        Display display = ((WindowManager)context.getSystemService(context.WINDOW_SERVICE)).defaultDisplay
+
+        if(display.getRotation() == Surface.ROTATION_0) {
+            mCamera.setDisplayOrientation(90)
+        }else if(display.getRotation() == Surface.ROTATION_270) {
+            mCamera.setDisplayOrientation(180)
+        }
 
         // Start preview with new settings
         try {

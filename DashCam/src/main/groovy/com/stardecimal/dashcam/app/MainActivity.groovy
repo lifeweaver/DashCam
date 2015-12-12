@@ -8,9 +8,11 @@ import android.os.Bundle
 import android.util.Log
 import android.view.SurfaceView
 import android.view.View
+import android.view.WindowManager
 import android.widget.Button
 import android.widget.FrameLayout
 import android.widget.TextView
+import android.widget.Toast
 import groovy.transform.CompileStatic;
 
 @CompileStatic
@@ -19,26 +21,22 @@ public class MainActivity extends Activity {
     Camera mCamera
     Preview mPreview
     MediaRecorder mMediaRecorder
+    FrameLayout framePreview
+    String outputFile
     private boolean isRecording = false
+    static String TAG = "DashCam"
 
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
+        KeepScreenOn()
 
         def message = findViewById(R.id.message) as TextView
         message.text = 'hello josh'
 
-        // Create an instance of Camera
-        mCamera = getCameraInstance()
-        def holder = ((SurfaceView) findViewById(R.id.surfaceView)).holder
-
-        // Create our Preview view and set it as the content of our activity
-        mPreview = new Preview(this, mCamera, holder)
-        FrameLayout preview = (FrameLayout) findViewById(R.id.cameraPreview)
-        preview.addView(mPreview)
-
+        InitializeCameraAndPreview()
 
         Button captureButton = (Button) findViewById(R.id.pushBtn)
         captureButton.setOnClickListener(
@@ -46,58 +44,102 @@ public class MainActivity extends Activity {
                     @Override
                     public void onClick(View view) {
                         if(isRecording) {
-                            // stop recording and release camera
-                            mMediaRecorder.stop()
-                            releaseMediaRecorder()
-                            mCamera.lock()
-
-                            // inform user that recording has stopped
-                            setCaptureButtonText("Capture")
-                            isRecording = false
+                            StopRecording()
+                            Toast.makeText(view.context, "File: ${outputFile}", Toast.LENGTH_SHORT).show()
                         } else {
                             // init video camera
                             if(prepareVideoRecorder()) {
-                                // camera is available and unlocked, mediaRecorder is prepared, now you can start recording
-                                mMediaRecorder.start()
-
-                                // inform user that recording has started
-                                setCaptureButtonText("Stop")
-                                isRecording = true
+                                StartRecording()
                             } else {
                                 // prepare didn't work release camera
                                 releaseMediaRecorder()
-                                // inform user
-                                setCaptureButtonText("Capture")
                             }
                         }
                     }
                 }
         )
+    }
 
-        // Take video
-//        dispatchTakeVideoIntent()
+    def KeepScreenOn() {
+        getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+    }
+
+    def StartRecording() {
+        // camera is available and unlocked, mediaRecorder is prepared, now you can start recording
+        mMediaRecorder.start()
+
+        // inform user that recording has started
+        setCaptureButtonText("Stop")
+        isRecording = true
+    }
+
+    def StopRecording() {
+
+        // stop recording and release camera
+        if(mMediaRecorder) {
+            try {
+                mMediaRecorder.stop()
+            } catch(IllegalStateException e) {
+                new File(outputFile).delete()
+                Log.d(TAG, "No video record so deleting empty outputFile")
+            }
+            releaseMediaRecorder()
+        }
+
+        // inform user that recording has stopped
+        setCaptureButtonText("Start")
+        isRecording = false
+    }
+
+    def InitializeCameraAndPreview() {
+        // Create an instance of Camera
+        if(!mCamera) {
+            mCamera = getCameraInstance()
+        }
+
+        // Create our Preview view and set it as the content of our activity
+        if(!mPreview) {
+            def holder = ((SurfaceView) findViewById(R.id.surfaceView)).holder
+            mPreview = new Preview(this, mCamera, holder)
+            framePreview = (FrameLayout) findViewById(R.id.cameraPreview)
+            framePreview.addView(mPreview)
+        }
+
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume()
+        InitializeCameraAndPreview()
+        Log.d(TAG, "Resumed Josh3: mCamera, mPreview: " + mCamera + ", " + mPreview)
     }
 
     @Override
     protected  void onPause() {
-        super.onPause()
-        releaseMediaRecorder()
+        StopRecording()
+
         releaseCamera()
+        releasePreview()
+        super.onPause()
+        Log.d(TAG, "Paused Josh1")
     }
 
-
-    // Not sure if we want to do this or not, may want to keep recording but probably not.
     @Override
     protected void onStop() {
-        super.onStop()
-        releaseMediaRecorder()
         releaseCamera()
+        releasePreview()
+        super.onStop()
+        Log.d(TAG, "Stopped Josh2")
+
     }
 
     @Override
-    protected void onRestart() {
-        super.onRestart()
-
+    protected void onDestroy() {
+        StopRecording()
+        releaseCamera()
+        releasePreview()
+        super.onDestroy()
+        Log.d(TAG, "onDestroy Josh5")
     }
 
     private void releaseMediaRecorder() {
@@ -111,9 +153,16 @@ public class MainActivity extends Activity {
 
     private void releaseCamera() {
         if (mCamera) {
+            mCamera.stopPreview()
             mCamera.release()
             mCamera = null
+            mPreview.holder.removeCallback(mPreview)
         }
+    }
+
+    def releasePreview() {
+        framePreview.removeView(mPreview)
+        mPreview = null
     }
 
     private void setCaptureButtonText(String buttonText) {
@@ -128,16 +177,18 @@ public class MainActivity extends Activity {
             c = Camera.open(); // attempt to get a Camera instance
         }
         catch (Exception e){
-            Log.d("DashCam", "failed to get instance of camera: " + e.message)
+            Log.d(TAG, "failed to get instance of camera: " + e.message)
             // Camera is not available (in use or does not exist)
         }
         return c; // returns null if camera is unavailable
     }
 
     private boolean prepareVideoRecorder() {
+        Log.d(TAG, "mCamera1: " + mCamera)
         if(!mCamera) {
             mCamera = getCameraInstance()
         }
+        Log.d(TAG, "mCamera2: " + mCamera)
 
         mMediaRecorder = new MediaRecorder()
 
@@ -153,7 +204,8 @@ public class MainActivity extends Activity {
         mMediaRecorder.setProfile(CamcorderProfile.get(CamcorderProfile.QUALITY_HIGH))
 
         // step 4
-        mMediaRecorder.setOutputFile(FileUtil.getOutputMediaFile(FileUtil.MEDIA_TYPE_VIDEO).toString())
+        outputFile = FileUtil.getOutputMediaFile(FileUtil.MEDIA_TYPE_VIDEO).toString()
+        mMediaRecorder.setOutputFile(outputFile)
 
         //step 5
         mMediaRecorder.setPreviewDisplay(mPreview.getHolder().getSurface())
@@ -162,79 +214,12 @@ public class MainActivity extends Activity {
         try {
             mMediaRecorder.prepare()
         } catch (IllegalStateException e) {
-            Log.d("Dashcam", "IllegalStateException preparing MediaRecorder: " + e.message)
+            Log.d(TAG, "IllegalStateException preparing MediaRecorder: " + e.message)
             releaseMediaRecorder()
             return false
         } catch (IOException e) {
-            Log.d("DashCam", "IOException preparing MediaRecorder: " + e.message)
+            Log.d(TAG, "IOException preparing MediaRecorder: " + e.message)
         }
         return true
     }
-
-//    private boolean safeCameraOpen(id) {
-//        def cameraOpened = false
-//
-//        try {
-//            releaseCameraAndPreview()
-//            mCamera = Camera.open(id)
-//            cameraOpened = (mCamera != null)
-//        } catch (Exception e) {
-//            Log.e(getString(R.string.app_name), "failed to open Camera")
-//            e.printStackTrace()
-//        }
-//        return cameraOpened
-//    }
-//
-//    private void releaseCameraAndPreview() {
-//        mPreview.setCamera(null)
-//        if(mCamera) {
-//            mCamera.release()
-//            mCamera = null
-//        }
-//    }
-//
-//    public void setCamera(Camera camera) {
-//        if(mCamera == camera) {return}
-//
-//        stopPreviewAndFreeCamera()
-//
-//        mCamera = camera
-//
-//        if(mCamera) {
-//            List<Camera.Size> localSizes = mCamera.parameters.supportedPreviewSizes
-//            mSupportedpreviewSizes = localSizes
-//            requestLayout()
-//
-//            try {
-//                mCamera.previewDisplay = mHolder
-//            } catch (IOException e) {
-//                e.printStackTrace()
-//            }
-//
-//            // Important Call startPreview() to start updating the preview surface
-//            // Preview must be started before you can take a picture
-//            mCamera.startPreview()
-//        }
-//    }
-
-
-
-
-//    private void dispatchTakeVideoIntent() {
-//        Intent takeVideoIntent = new Intent(MediaStore.ACTION_VIDEO_CAPTURE)
-//        if(takeVideoIntent.resolveActivity(packageManager)) {
-//            startActivityForResult(takeVideoIntent, REQUEST_VIDEO_CAPTURE)
-//        }
-//    }
-//
-//    @Override
-//    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
-//        if(requestCode == REQUEST_VIDEO_CAPTURE && resultCode == RESULT_OK) {
-//            def videoUri = intent.data
-//            def mVideoView = findViewById(R.id.mVideoView) as VideoView
-//            mVideoView.setVideoURI(videoUri)
-//        }
-//    }
-
-
 }
