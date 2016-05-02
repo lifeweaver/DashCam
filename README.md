@@ -10,8 +10,7 @@ Features - In progress
  - Includes gps use
  - License plate recognition
  - Street sign recognition(maybe)
- - Start recording when the car starts and stops recording with the car turns off
- - (via usb connection to car, or maybe connection to OBD port)
+ - Start recording when the car starts and stops recording with the car turns off (via usb connection to car, or maybe connection to OBD port)
 
 Special Notes
 =============
