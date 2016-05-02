@@ -3,7 +3,7 @@ DashCam
 
 Android application to act as a dashcam
 
-Features
+Features - Inprogress
 ========
 
  - Records video
