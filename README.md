@@ -6,7 +6,7 @@ Android application to act as a dashcam
 Features - In progress
 ========
 
- - Records video
+ - Rolling video, i.e. only keeps the last ~15-20 minutes of video
  - Includes gps use
  - License plate recognition
  - Street sign recognition(maybe)
