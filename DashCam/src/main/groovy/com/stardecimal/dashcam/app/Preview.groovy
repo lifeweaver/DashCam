@@ -22,14 +22,13 @@ class Preview extends ViewGroup implements SurfaceHolder.Callback {
         super(context)
         mCamera = camera
 
-        // install a surfaceholder.callback so we get notified when the underlying surface is created and destroyeddef
+        // install a surfaceHolder.callback so we get notified when the underlying surface is created and destroyeddef
 
         mHolder = holder
         mHolder.addCallback(this)
 
-        // deprecated setting, but require3d on android versions prior to 3.0
+        // deprecated setting, but required on android versions prior to 3.0
         mHolder.setType(SurfaceHolder.SURFACE_TYPE_PUSH_BUFFERS)
-
     }
 
     def SurfaceHolder getHolder() {
@@ -58,7 +57,7 @@ class Preview extends ViewGroup implements SurfaceHolder.Callback {
         // Make sure to stop the preview before resizing or reformatting it.
 
         if(!mHolder.surface) {
-            // preview surface does not exist.
+            Log.d("DashCam", 'preview surface does not exist')
             return
         }
 
@@ -66,7 +65,7 @@ class Preview extends ViewGroup implements SurfaceHolder.Callback {
         try {
             mCamera.stopPreview()
         } catch ( Exception e) {
-            Log.d("DashCam", "Tried to stop a non-existent preview")
+            Log.d("DashCam", "Tried to stop a non-existent preview: ${e}")
         }
 
         // set preview size and make any resize, rotate or reformatting changes here
